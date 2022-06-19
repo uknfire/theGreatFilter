@@ -1,11 +1,10 @@
 # The Great Filter（预览）
 
-一个简单的 Web 过滤器框架，可以过滤网页中 API 返回的请求。请搭配 Chrome Extension 或者油猴插件使用
+一个 ajax 过滤器插件，对 fetch 和 xhr 进行中间人劫持，从而允许使用者过滤或修改网页 API 响应。搭配 Chrome Extension 或者油猴插件使用
 
 ## 原理
 
-在 document 开头注入 script，替换全局的 `fetch` 和 `XMLHttpRequest` 函数，从而实现对响应的过滤
-用户可通过编写插件来实现自定义过滤功能
+在 document 开头注入 script，替换全局的 `fetch` 和 `XMLHttpRequest` 函数，从而实现对响应的中间人劫持。用户可通过编写插件来实现自定义过滤功能
 
 ## 举个例子
 
@@ -40,7 +39,7 @@ npm run build:watch
 
 ### 选项二：使用油猴插件
 
-点击油猴插件的按钮，选择添加新脚本后，将 build/monkey.js 内的文本粘贴到油猴编辑器中
+访问 [theGreatFilter.user.js](https://github.com/uknfire/theGreatFilter/raw/master/build/theGreatFilter.user.js) 自动安装
 
 ### 注意事项
 

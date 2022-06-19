@@ -8,7 +8,7 @@
     "build:watch": "esbuild --bundle index.ts --outfile=build/dist.js --watch",
     "prebuild": "tsc --noEmit",
     "build": "esbuild --minify --bundle index.ts --outfile=build/dist.js",
-    "postbuild": "cp template/tampermonkey.js build/monkey.js; cat build/dist.js >> build/monkey.js"
+    "postbuild": "cp template/tampermonkey.js build/theGreatFilter.user.js; cat build/dist.js >> build/theGreatFilter.user.js"
   },
   "keywords": [
     "chrome",

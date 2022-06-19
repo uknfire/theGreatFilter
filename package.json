@@ -1,0 +1,24 @@
+{
+  "name": "the-great-filter",
+  "version": "0.0.1",
+  "description": "",
+  "private": true,
+  "main": "core/index.ts",
+  "scripts": {
+    "build:watch": "esbuild --bundle index.ts --outfile=build/dist.js --watch",
+    "prebuild": "tsc --noEmit",
+    "build": "esbuild --minify --bundle index.ts --outfile=build/dist.js",
+    "postbuild": "cp template/tampermonkey.js build/monkey.js; cat build/dist.js >> build/monkey.js"
+  },
+  "keywords": [
+    "chrome",
+    "extension",
+    "filter"
+  ],
+  "author": "uknfire",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.14.43",
+    "typescript": "^4.7.3"
+  }
+}

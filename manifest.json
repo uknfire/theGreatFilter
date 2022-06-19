@@ -1,0 +1,34 @@
+{
+  "name": "The Great Filter",
+  "version": "0.0.1",
+  "description": "To modify response json of ajax requests",
+  "host_permissions": [
+    "https://www.zhihu.com/",
+    "https://twitter.com/"
+  ],
+  "manifest_version": 3,
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.zhihu.com/*",
+        "https://twitter.com/*"
+      ],
+      "js": [
+        "./content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "build/dist.js"
+      ],
+      "matches": [
+        "https://www.zhihu.com/*",
+        "https://twitter.com/*"
+      ]
+    }
+  ]
+}

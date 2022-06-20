@@ -70,6 +70,70 @@
     }
   };
 
+  // core/filters/example/zhihuSearchAsyncFilter.ts
+  function logger2(...args) {
+    console.log("%c TGF[searchAsync]:", "color: blue", ...args);
+  }
+  async function getUserDetail(urlToken) {
+    if (urlToken === "0") {
+      return {
+        isAnonymous: true,
+        isAvailable: true,
+        name: "\u533F\u540D\u7528\u6237",
+        followerCount: 0,
+        answerCount: 0,
+        articlesCount: 0
+      };
+    }
+    const url = `https://www.zhihu.com/api/v4/members/${urlToken}?include=answer_count%2Cfollower_count%2Carticles_count%2Cbadge[%3F(type%3Dbest_answerer)].topics`;
+    const res = await fetch(url);
+    const json = await res.json();
+    return {
+      isAnonymous: false,
+      isAvailable: json.error !== void 0,
+      name: json.name,
+      answerCount: json.answer_count ?? 0,
+      articlesCount: json.articles_count ?? 0,
+      followerCount: json.follower_count ?? 0
+    };
+  }
+  async function isUserGood(urlToken) {
+    const user = await getUserDetail(urlToken);
+    if (!user.isAvailable || user.isAnonymous) {
+      return true;
+    }
+    const activitiesCount = user.answerCount + user.articlesCount;
+    if (activitiesCount > 2e3) {
+      logger2("\u592A\u9AD8\u4EA7", user.name, "\u56DE\u7B54\u548C\u6587\u7AE0\u603B\u548C", activitiesCount);
+      return false;
+    }
+    if (user.followerCount / activitiesCount < 10) {
+      logger2("\u8F6C\u5316\u7387\u592A\u4F4E", user.name, "\u56DE\u7B54\u548C\u6587\u7AE0\u603B\u548C", activitiesCount, "\u5173\u6CE8\u6570", user.followerCount);
+      return false;
+    }
+    return true;
+  }
+  async function asyncFilter(items, asyncPredicate) {
+    const ps = await Promise.allSettled(items.map(asyncPredicate));
+    return items.filter((_, index) => {
+      const p = ps[index];
+      return p.status === "rejected" || p.value;
+    });
+  }
+  var zhihuSearchAsyncFilter = {
+    name: "zhihuSearchAsyncFilter",
+    isMatch: (url) => url.startsWith("https://www.zhihu.com/api/v4/search_v3"),
+    intercept: async (json) => {
+      const predicate2 = async (item) => {
+        if (!item.object?.author?.url_token) {
+          return true;
+        }
+        return isUserGood(item.object.author.url_token);
+      };
+      json.data = await asyncFilter(json.data, predicate2);
+    }
+  };
+
   // core/index.ts
   var TGF = class {
     constructor() {
@@ -210,6 +274,7 @@
   var tgf = new TGF();
   if (window.location.origin === "https://www.zhihu.com") {
     tgf.use(zhihuSearchFilter);
+    tgf.useAsync(zhihuSearchAsyncFilter);
   }
   window.fetch = tgf.buildFetch(window.fetch);
   window.XMLHttpRequest = tgf.buildXHR(window.XMLHttpRequest);

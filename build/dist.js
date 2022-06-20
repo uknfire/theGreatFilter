@@ -1,1 +1,204 @@
-(()=>{var h=(...e)=>{console.log("%c TGF[search]:","color: red",...e)};function w(e){let t=e.object?.title??e.object?.question?.name;return t=t?.replaceAll("<em>","").replaceAll("</em>",""),{title:t,type:e.type,subtype:e.object?.type,hasAuthor:e.object?.author!==void 0,isAuthorAnonymous:e.object?.author?.url_token==="0",author:e.object?.author?.name,authorFollowerCount:e.object?.author?.follower_count??0,authorVoteupCount:e.object?.author?.voteup_count??0,isSearchResult:e.type==="search_result",hasVideo:e.object?.attachment?.type==="video",isVerified:e.object?.author?.badge_v2?.title==="\u5DF2\u8BA4\u8BC1\u5E10\u53F7"}}function m(e){let t=w(e);return t.isSearchResult?t.hasVideo?(h(`\u79FB\u9664\u89C6\u9891\u56DE\u7B54\uFF1A${t.title}`),!1):t.hasAuthor&&!t.isAuthorAnonymous&&t.authorFollowerCount<100?(h(`\u79FB\u9664\u4F4E\u5173\u6CE8\u7528\u6237\uFF1A${t.title} ${t.author} \u5173\u6CE8\u6570${t.authorFollowerCount}`),!1):["\u4E5D\u7AE0\u7B97\u6CD5"].includes(t.author)?(h(`\u79FB\u9664\u8425\u9500\u53F7\uFF1A${t.title} ${t.author}`),!1):["question","roundtable","special"].includes(t.subtype)?(h(`\u79FB\u9664\u975E\u56DE\u7B54\u7ED3\u679C\uFF1A${t.title} ${t.subtype}`),!1):t.title?.endsWith("!")||t.title?.endsWith("\uFF01")?(h(`\u79FB\u9664\u6807\u9898\u515A\uFF1A${t.title} ${t.subtype}`),!1):!0:(h(`\u79FB\u9664\u975E\u641C\u7D22\u7ED3\u679C\uFF1A${t.title} ${t.type}`),!1)}var d={name:"zhihuSearchFilter",isMatch:e=>e.startsWith("https://www.zhihu.com/api/v4/search_v3"),intercept:e=>{e.data=e.data.filter(m)}};var y=class{constructor(){this.filters=[];this.asyncFilters=[]}use(t){this.filters.push(t)}useAsync(t){this.asyncFilters.push(t)}buildIntercept(t){let c=this.filters.filter(r=>r.isMatch(t));if(c.length!==0)return function(r){c.forEach(s=>{try{s.intercept(r)}catch{console.error(`TGF: ${s.name} error`)}})}}buildAsyncIntercept(t){let c=this.asyncFilters.filter(r=>r.isMatch(t));if(c.length!==0)return async function(r){for(let s of c)try{await s.intercept(r)}catch{console.warn(`TGF: ${s.name} error`)}}}buildFetch(t){return async(c,r)=>{let s=await t(c,r);if(!s.ok)return s;let p=s.url,o=this.buildIntercept(p),l=this.buildAsyncIntercept(p);if(!o&&!l)return s;let u=await s.json();return o?.(u),await l?.(u),new Response(JSON.stringify(u),{headers:s.headers,status:s.status,statusText:s.statusText})}}buildXHR(t){let c=this.buildIntercept.bind(this),r=this.buildAsyncIntercept.bind(this),s=Symbol("xhrRes"),p=Symbol("xhrResText");return function(){let o=new t,l=()=>{let i=c(o.responseURL);if(i){let n=JSON.parse(o.responseText);i(n);let a=JSON.stringify(n);this.response=a,this.responseText=a}},u=async()=>{let i=r(o.responseURL);if(i){let n=JSON.parse(o.responseText);await i(n);let a=JSON.stringify(n);this.response=a,this.responseText=a}};o.onload=(...i)=>{!this.onload||(l(),u().finally(()=>{this.onload.apply(this,i)}))},o.onreadystatechange=(...i)=>{!this.onreadystatechange||(this.readyState===4?(l(),u().finally(()=>{this.onreadystatechange.apply(this,i)})):this.onreadystatechange.apply(this,i))};for(let i in o){let n=i;if(!(n==="onreadystatechange"||n==="onload"))if(typeof o[n]=="function")this[n]=o[n].bind(o);else if(n==="response"||n==="responseText"){let a=n==="response"?s:p;Object.defineProperty(this,n,{get:()=>this[a]??o[n],set:b=>this[a]=b,enumerable:!0})}else Object.defineProperty(this,n,{get:()=>o[n],set:a=>o[n]=a,enumerable:!0})}}}};var f=new y;window.location.origin==="https://www.zhihu.com"&&f.use(d);window.fetch=f.buildFetch(window.fetch);window.XMLHttpRequest=f.buildXHR(window.XMLHttpRequest);})();
+(() => {
+  // core/filters/example/zhihuSearchFilter.ts
+  function logger(...args) {
+    console.log("%c TGF[search]:", "color: red", ...args);
+  }
+  function normalizeSearchItem(searchItem) {
+    let title = searchItem.object?.title ?? searchItem.object?.question?.name;
+    title = title?.replaceAll("<em>", "").replaceAll("</em>", "");
+    const author = searchItem.object?.author?.name === void 0 ? void 0 : {
+      name: searchItem.object.author.name,
+      isAnonymous: searchItem.object?.author?.url_token === "0",
+      isVerified: searchItem.object?.author?.badge_v2?.title === "\u5DF2\u8BA4\u8BC1\u5E10\u53F7",
+      followerCount: searchItem.object?.author?.follower_count ?? 0,
+      voteupCount: searchItem.object?.author?.voteup_count ?? 0
+    };
+    return {
+      title,
+      type: searchItem.type,
+      subtype: searchItem.object?.type,
+      isSearchResult: searchItem.type === "search_result",
+      hasVideo: searchItem.object?.attachment?.type === "video",
+      author
+    };
+  }
+  function predicate(searchItem) {
+    const item = normalizeSearchItem(searchItem);
+    if (!item.isSearchResult) {
+      logger(`\u79FB\u9664\u975E\u641C\u7D22\u7ED3\u679C\uFF1A${item.title} ${item.type}`);
+      return false;
+    }
+    if (item.hasVideo) {
+      logger(`\u79FB\u9664\u89C6\u9891\u56DE\u7B54\uFF1A${item.title}`);
+      return false;
+    }
+    if (item.author && !item.author.isAnonymous && item.author.followerCount < 100) {
+      logger(`\u79FB\u9664\u4F4E\u5173\u6CE8\u7528\u6237\uFF1A${item.title} ${item.author} \u5173\u6CE8\u6570`, item.author.followerCount);
+      return false;
+    }
+    if (item.author && ["\u4E5D\u7AE0\u7B97\u6CD5"].includes(item.author.name)) {
+      logger(`\u79FB\u9664\u8425\u9500\u53F7\uFF1A${item.title} ${item.author}`);
+      return false;
+    }
+    if (["question", "roundtable", "special"].includes(item.subtype)) {
+      logger(`\u79FB\u9664\u975E\u56DE\u7B54\u7ED3\u679C\uFF1A${item.title} ${item.subtype}`);
+      return false;
+    }
+    if (item.title?.endsWith("!") || item.title?.endsWith("\uFF01")) {
+      logger(`\u79FB\u9664\u6807\u9898\u515A\uFF1A${item.title} ${item.subtype}`);
+      return false;
+    }
+    return true;
+  }
+  var zhihuSearchFilter = {
+    name: "zhihuSearchFilter",
+    isMatch: (url) => url.startsWith("https://www.zhihu.com/api/v4/search_v3"),
+    intercept: (json) => {
+      json.data = json.data.filter(predicate);
+    }
+  };
+
+  // core/index.ts
+  var TGF = class {
+    constructor() {
+      this.filters = [];
+      this.asyncFilters = [];
+    }
+    use(filter) {
+      this.filters.push(filter);
+    }
+    useAsync(filter) {
+      this.asyncFilters.push(filter);
+    }
+    buildIntercept(url) {
+      const matchedFilters = this.filters.filter((filter) => filter.isMatch(url));
+      if (matchedFilters.length === 0) {
+        return void 0;
+      }
+      return function(json) {
+        matchedFilters.forEach((filter) => {
+          try {
+            filter.intercept(json);
+          } catch {
+            console.error(`TGF: ${filter.name} error`);
+          }
+        });
+      };
+    }
+    buildAsyncIntercept(url) {
+      const matchedFilters = this.asyncFilters.filter((filter) => filter.isMatch(url));
+      if (matchedFilters.length === 0) {
+        return void 0;
+      }
+      return async function(json) {
+        for (const filter of matchedFilters) {
+          try {
+            await filter.intercept(json);
+          } catch {
+            console.warn(`TGF: ${filter.name} error`);
+          }
+        }
+      };
+    }
+    buildFetch(originalFetch) {
+      return async (input, init) => {
+        const response = await originalFetch(input, init);
+        if (!response.ok) {
+          return response;
+        }
+        const url = response.url;
+        const intercept = this.buildIntercept(url);
+        const asyncIntercept = this.buildAsyncIntercept(url);
+        if (!intercept && !asyncIntercept) {
+          return response;
+        }
+        const json = await response.json();
+        intercept?.(json);
+        await asyncIntercept?.(json);
+        return new Response(JSON.stringify(json), {
+          headers: response.headers,
+          status: response.status,
+          statusText: response.statusText
+        });
+      };
+    }
+    buildXHR(originalXHR) {
+      const buildIntercept = this.buildIntercept.bind(this);
+      const buildAsyncIntercept = this.buildAsyncIntercept.bind(this);
+      const xhrRes = Symbol("xhrRes");
+      const xhrResText = Symbol("xhrResText");
+      return function() {
+        const xhr = new originalXHR();
+        const tryModifyResponse = () => {
+          const intercept = buildIntercept(xhr.responseURL);
+          if (intercept) {
+            const json = JSON.parse(xhr.responseText);
+            intercept(json);
+            const newResponseText = JSON.stringify(json);
+            this.response = newResponseText;
+            this.responseText = newResponseText;
+          }
+        };
+        const tryAsyncModifyResponse = async () => {
+          const asyncIntercept = buildAsyncIntercept(xhr.responseURL);
+          if (asyncIntercept) {
+            const json = JSON.parse(xhr.responseText);
+            await asyncIntercept(json);
+            const newResponseText = JSON.stringify(json);
+            this.response = newResponseText;
+            this.responseText = newResponseText;
+          }
+        };
+        xhr.onload = (...args) => {
+          if (!this.onload)
+            return;
+          tryModifyResponse();
+          tryAsyncModifyResponse().finally(() => {
+            this.onload.apply(this, args);
+          });
+        };
+        xhr.onreadystatechange = (...args) => {
+          if (!this.onreadystatechange)
+            return;
+          if (this.readyState === 4) {
+            tryModifyResponse();
+            tryAsyncModifyResponse().finally(() => {
+              this.onreadystatechange.apply(this, args);
+            });
+          } else {
+            this.onreadystatechange.apply(this, args);
+          }
+        };
+        for (const key in xhr) {
+          const attr = key;
+          if (attr === "onreadystatechange" || attr === "onload")
+            continue;
+          if (typeof xhr[attr] === "function") {
+            this[attr] = xhr[attr].bind(xhr);
+          } else if (attr === "response" || attr === "responseText") {
+            const symbol = attr === "response" ? xhrRes : xhrResText;
+            Object.defineProperty(this, attr, {
+              get: () => this[symbol] ?? xhr[attr],
+              set: (val) => this[symbol] = val,
+              enumerable: true
+            });
+          } else {
+            Object.defineProperty(this, attr, {
+              get: () => xhr[attr],
+              set: (val) => xhr[attr] = val,
+              enumerable: true
+            });
+          }
+        }
+      };
+    }
+  };
+
+  // index.ts
+  var tgf = new TGF();
+  if (window.location.origin === "https://www.zhihu.com") {
+    tgf.use(zhihuSearchFilter);
+  }
+  window.fetch = tgf.buildFetch(window.fetch);
+  window.XMLHttpRequest = tgf.buildXHR(window.XMLHttpRequest);
+})();

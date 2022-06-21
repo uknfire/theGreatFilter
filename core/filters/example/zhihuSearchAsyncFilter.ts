@@ -6,7 +6,7 @@ async function getUserDetail(urlToken: string) {
     if (urlToken === '0') {
         return {
             isAnonymous: true,
-            isAvailable: true,
+            isAvailable: false,
             name: '匿名用户',
             followerCount: 0,
             answerCount: 0,
@@ -18,7 +18,7 @@ async function getUserDetail(urlToken: string) {
     const json = await res.json()
     return {
         isAnonymous: false,
-        isAvailable: json.error !== undefined, // 已停用用户或者已注销用户
+        isAvailable: json.error === undefined, // 非已停用用户或者已注销用户
         name: json.name as string | undefined,
         answerCount: (json.answer_count ?? 0) as number,
         articlesCount: (json.articles_count ?? 0) as number,

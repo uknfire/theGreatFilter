@@ -3,12 +3,10 @@ import { zhihuSearchAsyncFilter } from "./core/filters/example/zhihuSearchAsyncF
 import { TGF } from "./core"
 
 
-const tgf = new TGF()
-
-if (window.location.origin === 'https://www.zhihu.com') {
+if (window.location.href.startsWith('https://www.zhihu.com/search')) {
+    const tgf = new TGF()
     tgf.use(zhihuSearchFilter)
     tgf.useAsync(zhihuSearchAsyncFilter)
+    window.fetch = tgf.buildFetch(window.fetch)
+    window.XMLHttpRequest = tgf.buildXHR(window.XMLHttpRequest)
 }
-
-window.fetch = tgf.buildFetch(window.fetch)
-window.XMLHttpRequest = tgf.buildXHR(window.XMLHttpRequest)

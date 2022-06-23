@@ -79,36 +79,31 @@ export class TGF {
         const xhrRes = Symbol('xhrRes')
         const xhrResText = Symbol('xhrResText')
 
+        async function onResponseTextComplete(responseURL: string, responseText: string): Promise<string> {
+            const intercept = buildIntercept(responseURL)
+            const asyncIntercept = buildAsyncIntercept(responseURL)
+            if (!intercept && !asyncIntercept) return responseText
+
+            const json = JSON.parse(responseText)
+            intercept?.(json)
+            await asyncIntercept?.(json)
+
+            return JSON.stringify(json)
+        }
+
         // this function is used to initialize the xhr object
         return function (this: XMLHttpRequest) {
             const xhr = new originalXHR()
-            const tryModifyResponse = () => {
-                const intercept = buildIntercept(xhr.responseURL)
-                if (intercept) {
-                    const json = JSON.parse(xhr.responseText)
-                    intercept(json)
-                    const newResponseText = JSON.stringify(json);
-                    (this as any).response = newResponseText;
-                    (this as any).responseText = newResponseText
-                }
-            }
-
             const tryAsyncModifyResponse = async () => {
-                const asyncIntercept = buildAsyncIntercept(xhr.responseURL)
-                if (asyncIntercept) {
-                    const json = JSON.parse(xhr.responseText)
-                    await asyncIntercept(json)
-                    const newResponseText = JSON.stringify(json);
-                    (this as any).response = newResponseText;
-                    (this as any).responseText = newResponseText
-                }
-            }
+                const newResponseText = await onResponseTextComplete(xhr.responseURL, xhr.responseText);
 
+                (this as any).response = newResponseText;
+                (this as any).responseText = newResponseText
+            }
 
             xhr.onload = (...args) => {
                 if (!this.onload) return
 
-                tryModifyResponse()
                 tryAsyncModifyResponse().finally(() => {
                     this.onload!.apply(this, args)
                 })
@@ -117,8 +112,7 @@ export class TGF {
             xhr.onreadystatechange = (...args) => {
                 if (!this.onreadystatechange) return
 
-                if (this.readyState === 4) {
-                    tryModifyResponse()
+                if (this.readyState === XMLHttpRequest.DONE) {
                     tryAsyncModifyResponse().finally(() => {
                         this.onreadystatechange!.apply(this, args)
                     })

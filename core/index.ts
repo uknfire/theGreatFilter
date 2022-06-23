@@ -74,68 +74,65 @@ export class TGF {
      * experimental
      */
     public buildXHR(originalXHR: typeof XMLHttpRequest): typeof XMLHttpRequest {
-        const buildIntercept = this.buildIntercept.bind(this)
-        const buildAsyncIntercept = this.buildAsyncIntercept.bind(this)
-        const xhrRes = Symbol('xhrRes')
-        const xhrResText = Symbol('xhrResText')
+        const tryAsyncModifyResponse = async (xhr: XMLHttpRequest) => {
+            const intercept = this.buildIntercept(xhr.responseURL)
+            const asyncIntercept = this.buildAsyncIntercept(xhr.responseURL)
+            if (!intercept && !asyncIntercept) return
 
-        async function onResponseTextComplete(responseURL: string, responseText: string): Promise<string> {
-            const intercept = buildIntercept(responseURL)
-            const asyncIntercept = buildAsyncIntercept(responseURL)
-            if (!intercept && !asyncIntercept) return responseText
-
-            const json = JSON.parse(responseText)
+            // note: responseText can only be accessed
+            // if its responseType is "text" or ''
+            const json = JSON.parse(xhr.responseText)
             intercept?.(json)
             await asyncIntercept?.(json)
 
             return JSON.stringify(json)
         }
 
+        const xhrRes = Symbol('xhrRes')
+        const xhrResText = Symbol('xhrResText')
+
         // this function is used to initialize the xhr object
         return function (this: XMLHttpRequest) {
             const xhr = new originalXHR()
-            const tryAsyncModifyResponse = async () => {
-                const newResponseText = await onResponseTextComplete(xhr.responseURL, xhr.responseText);
-
-                (this as any).response = newResponseText;
-                (this as any).responseText = newResponseText
+            const xhrProxy = this as XMLHttpRequest & {
+                response: any
+                responseText: string
             }
+            // onreadystatechange comes before onload
+            xhr.onreadystatechange = (ev) => {
+                if (xhr.readyState === originalXHR.DONE && xhr.status === 200) {
+                    tryAsyncModifyResponse(xhr)
+                        .then((newResponseText) => {
+                            if (newResponseText === undefined) return
 
-            xhr.onload = (...args) => {
-                if (!this.onload) return
-
-                tryAsyncModifyResponse().finally(() => {
-                    this.onload!.apply(this, args)
-                })
-            }
-
-            xhr.onreadystatechange = (...args) => {
-                if (!this.onreadystatechange) return
-
-                if (this.readyState === XMLHttpRequest.DONE) {
-                    tryAsyncModifyResponse().finally(() => {
-                        this.onreadystatechange!.apply(this, args)
-                    })
+                            xhrProxy.response = newResponseText
+                            xhrProxy.responseText = newResponseText
+                        }).finally(() => {
+                            xhrProxy.onreadystatechange?.(ev)
+                        })
                 } else {
-                    this.onreadystatechange.apply(this, args)
+                    xhrProxy.onreadystatechange?.(ev)
                 }
             }
 
             for (const key in xhr) {
                 const attr = key as keyof XMLHttpRequest
-                if (attr === 'onreadystatechange' || attr === 'onload') continue
+                if (attr === 'onreadystatechange') continue
 
-                if (typeof xhr[attr] === 'function') {
-                    (this as any)[attr] = xhr[attr].bind(xhr)
-                } else if (attr === "response" || attr === "responseText") {
+                if (attr === "response" || attr === "responseText") {
+                    // use symbol to avoid recursion
                     const symbol = attr === "response" ? xhrRes : xhrResText
-                    Object.defineProperty(this, attr, {
-                        get: () => (this as any)[symbol] ?? xhr[attr],
-                        set: (val) => (this as any)[symbol] = val,
+                    Object.defineProperty(xhrProxy, attr, {
+                        get: () => (xhrProxy as any)[symbol] ?? xhr[attr],
+                        // can't write to xhr, so save it to xhrProxy
+                        set: (val) => (xhrProxy as any)[symbol] = val,
                         enumerable: true,
                     })
+                }
+                else if (typeof xhr[attr] === 'function') {
+                    (xhrProxy as any)[attr] = (xhr[attr] as Function).bind(xhr)
                 } else {
-                    Object.defineProperty(this, attr, {
+                    Object.defineProperty(xhrProxy, attr, {
                         get: () => xhr[attr],
                         set: (val) => (xhr as any)[attr] = val,
                         enumerable: true,

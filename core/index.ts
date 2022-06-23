@@ -25,9 +25,7 @@ export class TGF {
             })
         }
     }
-    /**
-     * experimental
-     */
+
     private buildAsyncIntercept(url: string) {
         const matchedFilters = this.asyncFilters.filter(filter => filter.isMatch(url))
         if (matchedFilters.length === 0) {
@@ -44,6 +42,9 @@ export class TGF {
         }
     }
 
+    /**
+     * intercept only if response.ok && response is json
+     */
     public buildFetch(originalFetch: typeof fetch): typeof fetch {
         return async (input: RequestInfo | URL, init?: RequestInit) => {
             const response = await originalFetch(input, init)
@@ -71,7 +72,7 @@ export class TGF {
     }
 
     /**
-     * experimental
+     * intercept only if status === 200 && response is json
      */
     public buildXHR(originalXHR: typeof XMLHttpRequest): typeof XMLHttpRequest {
         const tryAsyncModifyResponse = async (xhr: XMLHttpRequest) => {
@@ -107,7 +108,8 @@ export class TGF {
 
                             xhrProxy.response = newResponseText
                             xhrProxy.responseText = newResponseText
-                        }).finally(() => {
+                        })
+                        .finally(() => {
                             xhrProxy.onreadystatechange?.(ev)
                         })
                 } else {
@@ -128,16 +130,19 @@ export class TGF {
                         set: (val) => (xhrProxy as any)[symbol] = val,
                         enumerable: true,
                     })
+                    continue
                 }
-                else if (typeof xhr[attr] === 'function') {
+
+                if (typeof xhr[attr] === 'function') {
                     (xhrProxy as any)[attr] = (xhr[attr] as Function).bind(xhr)
-                } else {
-                    Object.defineProperty(xhrProxy, attr, {
-                        get: () => xhr[attr],
-                        set: (val) => (xhr as any)[attr] = val,
-                        enumerable: true,
-                    })
+                    continue
                 }
+
+                Object.defineProperty(xhrProxy, attr, {
+                    get: () => xhr[attr],
+                    set: (val) => (xhr as any)[attr] = val,
+                    enumerable: true,
+                })
             }
         } as any
     };

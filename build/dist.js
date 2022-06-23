@@ -188,72 +188,57 @@
       };
     }
     buildXHR(originalXHR) {
-      const buildIntercept = this.buildIntercept.bind(this);
-      const buildAsyncIntercept = this.buildAsyncIntercept.bind(this);
+      const tryAsyncModifyResponse = async (xhr) => {
+        const intercept = this.buildIntercept(xhr.responseURL);
+        const asyncIntercept = this.buildAsyncIntercept(xhr.responseURL);
+        if (!intercept && !asyncIntercept)
+          return;
+        const json = JSON.parse(xhr.responseText);
+        intercept?.(json);
+        await asyncIntercept?.(json);
+        return JSON.stringify(json);
+      };
       const xhrRes = Symbol("xhrRes");
       const xhrResText = Symbol("xhrResText");
       return function() {
         const xhr = new originalXHR();
-        const tryModifyResponse = () => {
-          const intercept = buildIntercept(xhr.responseURL);
-          if (intercept) {
-            const json = JSON.parse(xhr.responseText);
-            intercept(json);
-            const newResponseText = JSON.stringify(json);
-            this.response = newResponseText;
-            this.responseText = newResponseText;
-          }
-        };
-        const tryAsyncModifyResponse = async () => {
-          const asyncIntercept = buildAsyncIntercept(xhr.responseURL);
-          if (asyncIntercept) {
-            const json = JSON.parse(xhr.responseText);
-            await asyncIntercept(json);
-            const newResponseText = JSON.stringify(json);
-            this.response = newResponseText;
-            this.responseText = newResponseText;
-          }
-        };
-        xhr.onload = (...args) => {
-          if (!this.onload)
-            return;
-          tryModifyResponse();
-          tryAsyncModifyResponse().finally(() => {
-            this.onload.apply(this, args);
-          });
-        };
-        xhr.onreadystatechange = (...args) => {
-          if (!this.onreadystatechange)
-            return;
-          if (this.readyState === 4) {
-            tryModifyResponse();
-            tryAsyncModifyResponse().finally(() => {
-              this.onreadystatechange.apply(this, args);
+        const xhrProxy = this;
+        xhr.onreadystatechange = (ev) => {
+          if (xhr.readyState === originalXHR.DONE && xhr.status === 200) {
+            tryAsyncModifyResponse(xhr).then((newResponseText) => {
+              if (newResponseText === void 0)
+                return;
+              xhrProxy.response = newResponseText;
+              xhrProxy.responseText = newResponseText;
+            }).finally(() => {
+              xhrProxy.onreadystatechange?.(ev);
             });
           } else {
-            this.onreadystatechange.apply(this, args);
+            xhrProxy.onreadystatechange?.(ev);
           }
         };
         for (const key in xhr) {
           const attr = key;
-          if (attr === "onreadystatechange" || attr === "onload")
+          if (attr === "onreadystatechange")
             continue;
-          if (typeof xhr[attr] === "function") {
-            this[attr] = xhr[attr].bind(xhr);
-          } else if (attr === "response" || attr === "responseText") {
+          if (attr === "response" || attr === "responseText") {
             const symbol = attr === "response" ? xhrRes : xhrResText;
-            Object.defineProperty(this, attr, {
-              get: () => this[symbol] ?? xhr[attr],
-              set: (val) => this[symbol] = val,
+            Object.defineProperty(xhrProxy, attr, {
+              get: () => xhrProxy[symbol] ?? xhr[attr],
+              set: (val) => xhrProxy[symbol] = val,
               enumerable: true
             });
-          } else {
-            Object.defineProperty(this, attr, {
-              get: () => xhr[attr],
-              set: (val) => xhr[attr] = val,
-              enumerable: true
-            });
+            continue;
           }
+          if (typeof xhr[attr] === "function") {
+            xhrProxy[attr] = xhr[attr].bind(xhr);
+            continue;
+          }
+          Object.defineProperty(xhrProxy, attr, {
+            get: () => xhr[attr],
+            set: (val) => xhr[attr] = val,
+            enumerable: true
+          });
         }
       };
     }

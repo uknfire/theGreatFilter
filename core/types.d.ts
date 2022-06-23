@@ -9,9 +9,3 @@ declare interface AsyncFilter {
     isMatch: (url: string) => boolean
     intercept: (json: any) => Promise<void>
 }
-
-declare interface Interceptor {
-    baseUrl: string
-    filters: Filter[]
-    asyncFilters: AsyncFilter[]
-}

@@ -18,6 +18,7 @@ function normalizeSearchItem(searchItem: any) {
         subtype: searchItem.object?.type as string | undefined,   //  "answer", "article" etc.
         isSearchResult: searchItem.type === "search_result",
         hasVideo: searchItem.object?.attachment?.type === "video",
+        hasBaiduPan: () => (searchItem.object?.content?.includes('https://link.zhihu.com/?target=https%3A//pan.baidu.com/s/') ?? false) as boolean, // lazy compute to improve performance
         author,
     }
 }
@@ -25,30 +26,34 @@ function normalizeSearchItem(searchItem: any) {
 function predicate(searchItem: any) {
     const item = normalizeSearchItem(searchItem)
     if (!item.isSearchResult) {
-        logger(`移除非搜索结果：${item.title} ${item.type}`)
+        logger(`移除${item.type}：${item.title}`)
         return false
     }
     if (item.hasVideo) {
         logger(`移除视频回答：${item.title}`)
         return false
     }
-    if (item.author && !item.author.isAnonymous && item.author.followerCount < 100) {
-        logger(`移除低关注用户：${item.title} ${item.author} 关注数`, item.author.followerCount)
-        return false
-    }
+    // if (item.author && !item.author.isAnonymous && item.author.followerCount < 10) {
+    //     logger(`移除低关注用户：${item.title} ${item.author.name} 关注数`, item.author.followerCount)
+    //     return false
+    // }
     if (item.author && ['九章算法'].includes(item.author.name)) {
-        logger(`移除营销号：${item.title} ${item.author}`)
+        logger(`移除营销号：${item.title} ${item.author.name}`)
         return false
     }
     if (["question", "roundtable", "special"].includes(item.subtype!)) {
-        logger(`移除非回答结果：${item.title} ${item.subtype}`)
+        logger(`移除${item.subtype}：${item.title}`)
         return false
     }
     if (item.title?.endsWith("!") || item.title?.endsWith("！")) {
         logger(`移除标题党：${item.title} ${item.subtype}`)
         return false
     }
-    // logger(`保留结果：${item.title}`, obj)
+    if (item.hasBaiduPan()) {
+        logger(`移除百度网盘链接：${item.title}`)
+        return false
+    }
+    // logger(`保留结果：${item.title}`, searchItem)
     return true
 }
 

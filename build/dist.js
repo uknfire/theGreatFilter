@@ -19,33 +19,34 @@
       subtype: searchItem.object?.type,
       isSearchResult: searchItem.type === "search_result",
       hasVideo: searchItem.object?.attachment?.type === "video",
+      hasBaiduPan: () => searchItem.object?.content?.includes("https://link.zhihu.com/?target=https%3A//pan.baidu.com/s/") ?? false,
       author
     };
   }
   function predicate(searchItem) {
     const item = normalizeSearchItem(searchItem);
     if (!item.isSearchResult) {
-      logger(`\u79FB\u9664\u975E\u641C\u7D22\u7ED3\u679C\uFF1A${item.title} ${item.type}`);
+      logger(`\u79FB\u9664${item.type}\uFF1A${item.title}`);
       return false;
     }
     if (item.hasVideo) {
       logger(`\u79FB\u9664\u89C6\u9891\u56DE\u7B54\uFF1A${item.title}`);
       return false;
     }
-    if (item.author && !item.author.isAnonymous && item.author.followerCount < 100) {
-      logger(`\u79FB\u9664\u4F4E\u5173\u6CE8\u7528\u6237\uFF1A${item.title} ${item.author} \u5173\u6CE8\u6570`, item.author.followerCount);
-      return false;
-    }
     if (item.author && ["\u4E5D\u7AE0\u7B97\u6CD5"].includes(item.author.name)) {
-      logger(`\u79FB\u9664\u8425\u9500\u53F7\uFF1A${item.title} ${item.author}`);
+      logger(`\u79FB\u9664\u8425\u9500\u53F7\uFF1A${item.title} ${item.author.name}`);
       return false;
     }
     if (["question", "roundtable", "special"].includes(item.subtype)) {
-      logger(`\u79FB\u9664\u975E\u56DE\u7B54\u7ED3\u679C\uFF1A${item.title} ${item.subtype}`);
+      logger(`\u79FB\u9664${item.subtype}\uFF1A${item.title}`);
       return false;
     }
     if (item.title?.endsWith("!") || item.title?.endsWith("\uFF01")) {
       logger(`\u79FB\u9664\u6807\u9898\u515A\uFF1A${item.title} ${item.subtype}`);
+      return false;
+    }
+    if (item.hasBaiduPan()) {
+      logger(`\u79FB\u9664\u767E\u5EA6\u7F51\u76D8\u94FE\u63A5\uFF1A${item.title}`);
       return false;
     }
     return true;
@@ -66,7 +67,7 @@
     if (urlToken === "0") {
       return {
         isAnonymous: true,
-        isAvailable: true,
+        isAvailable: false,
         name: "\u533F\u540D\u7528\u6237",
         followerCount: 0,
         answerCount: 0,
@@ -78,7 +79,7 @@
     const json = await res.json();
     return {
       isAnonymous: false,
-      isAvailable: json.error !== void 0,
+      isAvailable: json.error === void 0,
       name: json.name,
       answerCount: json.answer_count ?? 0,
       articlesCount: json.articles_count ?? 0,
@@ -259,11 +260,11 @@
   };
 
   // index.ts
-  var tgf = new TGF();
-  if (window.location.origin === "https://www.zhihu.com") {
+  if (window.location.href.startsWith("https://www.zhihu.com/search")) {
+    const tgf = new TGF();
     tgf.use(zhihuSearchFilter);
     tgf.useAsync(zhihuSearchAsyncFilter);
+    window.fetch = tgf.buildFetch(window.fetch);
+    window.XMLHttpRequest = tgf.buildXHR(window.XMLHttpRequest);
   }
-  window.fetch = tgf.buildFetch(window.fetch);
-  window.XMLHttpRequest = tgf.buildXHR(window.XMLHttpRequest);
 })();
